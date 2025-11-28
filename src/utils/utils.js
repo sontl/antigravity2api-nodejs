@@ -1,6 +1,7 @@
 import config from '../config/config.js';
 import tokenManager from '../auth/token_manager.js';
 import { generateRequestId } from './idGenerator.js';
+import os from 'os';
 
 function extractImagesFromContent(content) {
   const result = { text: '', images: [] };
@@ -168,11 +169,7 @@ function convertOpenAIToolsToAntigravity(openaiTools){
     }
   })
 }
-async function generateRequestBody(openaiMessages,modelName,parameters,openaiTools){
-  const token = await tokenManager.getToken();
-  if (!token) {
-    throw new Error('没有可用的token，请运行 npm run login 获取token');
-  }
+function generateRequestBody(openaiMessages,modelName,parameters,openaiTools,token){
   
   const enableThinking = modelName.endsWith('-thinking') || 
     modelName === 'gemini-2.5-pro' || 
@@ -203,7 +200,19 @@ async function generateRequestBody(openaiMessages,modelName,parameters,openaiToo
     userAgent: "antigravity"
   }
 }
+function getDefaultIp(){
+  const interfaces = os.networkInterfaces();
+  if (interfaces.WLAN){
+    for (const inter of interfaces.WLAN){
+      if (inter.family === 'IPv4' && !inter.internal){
+          return inter.address;
+      }
+    }
+  }
+  return '127.0.0.1';
+}
 export{
   generateRequestId,
-  generateRequestBody
+  generateRequestBody,
+  getDefaultIp
 }
