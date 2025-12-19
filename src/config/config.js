@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import fs from 'fs';
+import crypto from 'crypto';
 import log from '../utils/logger.js';
 import { deepMerge } from '../utils/deepMerge.js';
 import { getConfigPaths } from '../utils/paths.js';
@@ -12,11 +13,53 @@ import {
   DEFAULT_MAX_REQUEST_SIZE,
   DEFAULT_MAX_IMAGES,
   MODEL_LIST_CACHE_TTL,
-  DEFAULT_GENERATION_PARAMS,
-  DEFAULT_ADMIN_USERNAME,
-  DEFAULT_ADMIN_PASSWORD,
-  DEFAULT_JWT_SECRET
+  DEFAULT_GENERATION_PARAMS
 } from '../constants/index.js';
+
+// 生成随机凭据的缓存
+let generatedCredentials = null;
+
+/**
+ * 生成或获取管理员凭据
+ * 如果用户未配置，自动生成随机凭据
+ */
+function getAdminCredentials() {
+  const username = process.env.ADMIN_USERNAME;
+  const password = process.env.ADMIN_PASSWORD;
+  const jwtSecret = process.env.JWT_SECRET;
+  
+  // 如果全部配置了，直接返回
+  if (username && password && jwtSecret) {
+    return { username, password, jwtSecret };
+  }
+  
+  // 生成随机凭据（只生成一次）
+  if (!generatedCredentials) {
+    generatedCredentials = {
+      username: username || `admin_${crypto.randomBytes(4).toString('hex')}`,
+      password: password || crypto.randomBytes(12).toString('base64').replace(/[+/=]/g, ''),
+      jwtSecret: jwtSecret || crypto.randomBytes(32).toString('hex')
+    };
+    
+    // 显示生成的凭据
+    if (!username || !password) {
+      log.warn('═══════════════════════════════════════════════════════════');
+      log.warn('⚠️  未配置管理员账号密码，已自动生成随机凭据：');
+      log.warn(`    用户名: ${generatedCredentials.username}`);
+      log.warn(`    密码:   ${generatedCredentials.password}`);
+      log.warn('═══════════════════════════════════════════════════════════');
+      log.warn('⚠️  重启后凭据将重新生成！建议在 .env 文件中配置：');
+      log.warn('    ADMIN_USERNAME=你的用户名');
+      log.warn('    ADMIN_PASSWORD=你的密码');
+      log.warn('    JWT_SECRET=你的密钥');
+      log.warn('═══════════════════════════════════════════════════════════');
+    } else if (!jwtSecret) {
+      log.warn('⚠️ 未配置 JWT_SECRET，已生成随机密钥（重启后登录会话将失效）');
+    }
+  }
+  
+  return generatedCredentials;
+}
 
 const { envPath, configJsonPath, examplePath } = getConfigPaths();
 
@@ -70,7 +113,7 @@ export function buildConfig(jsonConfig) {
       port: jsonConfig.server?.port || DEFAULT_SERVER_PORT,
       host: jsonConfig.server?.host || DEFAULT_SERVER_HOST,
       heartbeatInterval: jsonConfig.server?.heartbeatInterval || DEFAULT_HEARTBEAT_INTERVAL,
-      memoryThreshold: jsonConfig.server?.memoryThreshold || 500
+      memoryThreshold: jsonConfig.server?.memoryThreshold || 100
     },
     cache: {
       modelListTTL: jsonConfig.cache?.modelListTTL || MODEL_LIST_CACHE_TTL
@@ -99,11 +142,7 @@ export function buildConfig(jsonConfig) {
       maxRequestSize: jsonConfig.server?.maxRequestSize || DEFAULT_MAX_REQUEST_SIZE,
       apiKey: process.env.API_KEY || null
     },
-    admin: {
-      username: process.env.ADMIN_USERNAME || DEFAULT_ADMIN_USERNAME,
-      password: process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD,
-      jwtSecret: process.env.JWT_SECRET || DEFAULT_JWT_SECRET
-    },
+    admin: getAdminCredentials(),
     useNativeAxios: jsonConfig.other?.useNativeAxios !== false,
     timeout: jsonConfig.other?.timeout || DEFAULT_TIMEOUT,
     retryTimes: Number.isFinite(jsonConfig.other?.retryTimes) ? jsonConfig.other.retryTimes : DEFAULT_RETRY_TIMES,

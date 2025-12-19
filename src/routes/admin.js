@@ -16,14 +16,100 @@ const envPath = getEnvPath();
 
 const router = express.Router();
 
+// 登录速率限制 - 防止暴力破解
+const loginAttempts = new Map(); // IP -> { count, lastAttempt, blockedUntil }
+const MAX_LOGIN_ATTEMPTS = 5;
+const BLOCK_DURATION = 5 * 60 * 1000; // 5分钟
+const ATTEMPT_WINDOW = 15 * 60 * 1000; // 15分钟窗口
+
+function getClientIP(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+         req.headers['x-real-ip'] ||
+         req.connection?.remoteAddress ||
+         req.ip ||
+         'unknown';
+}
+
+function checkLoginRateLimit(ip) {
+  const now = Date.now();
+  const attempt = loginAttempts.get(ip);
+  
+  if (!attempt) return { allowed: true };
+  
+  // 检查是否被封禁
+  if (attempt.blockedUntil && now < attempt.blockedUntil) {
+    const remainingSeconds = Math.ceil((attempt.blockedUntil - now) / 1000);
+    return {
+      allowed: false,
+      message: `登录尝试过多，请 ${remainingSeconds} 秒后重试`,
+      remainingSeconds
+    };
+  }
+  
+  // 清理过期的尝试记录
+  if (now - attempt.lastAttempt > ATTEMPT_WINDOW) {
+    loginAttempts.delete(ip);
+    return { allowed: true };
+  }
+  
+  return { allowed: true };
+}
+
+function recordLoginAttempt(ip, success) {
+  const now = Date.now();
+  
+  if (success) {
+    // 登录成功，清除记录
+    loginAttempts.delete(ip);
+    return;
+  }
+  
+  // 登录失败，记录尝试
+  const attempt = loginAttempts.get(ip) || { count: 0, lastAttempt: now };
+  attempt.count++;
+  attempt.lastAttempt = now;
+  
+  // 超过最大尝试次数，封禁
+  if (attempt.count >= MAX_LOGIN_ATTEMPTS) {
+    attempt.blockedUntil = now + BLOCK_DURATION;
+    logger.warn(`IP ${ip} 因登录失败次数过多被暂时封禁`);
+  }
+  
+  loginAttempts.set(ip, attempt);
+}
+
 // 登录接口
 router.post('/login', (req, res) => {
+  const clientIP = getClientIP(req);
+  
+  // 检查速率限制
+  const rateCheck = checkLoginRateLimit(clientIP);
+  if (!rateCheck.allowed) {
+    return res.status(429).json({
+      success: false,
+      message: rateCheck.message,
+      retryAfter: rateCheck.remainingSeconds
+    });
+  }
+  
   const { username, password } = req.body;
   
+  // 验证输入
+  if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ success: false, message: '用户名和密码必填' });
+  }
+  
+  // 限制输入长度防止 DoS
+  if (username.length > 100 || password.length > 100) {
+    return res.status(400).json({ success: false, message: '输入过长' });
+  }
+  
   if (username === config.admin.username && password === config.admin.password) {
+    recordLoginAttempt(clientIP, true);
     const token = generateToken({ username, role: 'admin' });
     res.json({ success: true, token });
   } else {
+    recordLoginAttempt(clientIP, false);
     res.status(401).json({ success: false, message: '用户名或密码错误' });
   }
 });

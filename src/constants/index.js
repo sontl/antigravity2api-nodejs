@@ -37,19 +37,12 @@ export const MODEL_LIST_CACHE_TTL = 60 * 60 * 1000;
 
 // ==================== 内存管理常量 ====================
 
-/**
- * 内存压力阈值（字节）
- */
-export const MEMORY_THRESHOLDS = {
-  /** 低压力阈值 - 15MB */
-  LOW: 15 * 1024 * 1024,
-  /** 中等压力阈值 - 25MB */
-  MEDIUM: 25 * 1024 * 1024,
-  /** 高压力阈值 - 35MB */
-  HIGH: 35 * 1024 * 1024,
-  /** 目标内存 - 20MB */
-  TARGET: 20 * 1024 * 1024
-};
+// 注意：内存压力阈值现在由 memoryManager 根据用户配置的 memoryThreshold 动态计算
+// 用户配置的 memoryThreshold（MB）即为高压力阈值，其他阈值按比例计算：
+// - LOW: 30% 阈值
+// - MEDIUM: 60% 阈值
+// - HIGH: 100% 阈值（用户配置值）
+// - TARGET: 50% 阈值
 
 /**
  * GC 冷却时间（毫秒）
@@ -171,20 +164,6 @@ export const DEFAULT_STOP_SEQUENCES = [
 
 // ==================== 管理员默认配置 ====================
 
-/**
- * 默认管理员用户名
- * @type {string}
- */
-export const DEFAULT_ADMIN_USERNAME = 'admin';
-
-/**
- * 默认管理员密码
- * @type {string}
- */
-export const DEFAULT_ADMIN_PASSWORD = 'admin123';
-
-/**
- * 默认 JWT 密钥（生产环境应更改）
- * @type {string}
- */
-export const DEFAULT_JWT_SECRET = 'your-jwt-secret-key-change-this-in-production';
+// 注意：管理员凭据（用户名、密码、JWT密钥）现在由 config.js 自动生成随机值
+// 如果用户未配置，启动时会在控制台显示生成的凭据
+// 不再使用硬编码的默认值，提高安全性
