@@ -458,6 +458,52 @@ router.put('/rotation', cookieAuthMiddleware, (req, res) => {
   }
 });
 
+// ==================== 日志管理 API ====================
+
+// 获取日志列表
+router.get('/logs', cookieAuthMiddleware, (req, res) => {
+  try {
+    const { level, search, limit, offset } = req.query;
+    const options = {
+      level: level || 'all',
+      search: search || '',
+      limit: parseInt(limit) || 100,
+      offset: parseInt(offset) || 0
+    };
+    
+    const result = logger.getLogs(options);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error('获取日志失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 获取日志统计
+router.get('/logs/stats', cookieAuthMiddleware, (req, res) => {
+  try {
+    const stats = logger.getLogStats();
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    logger.error('获取日志统计失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 清空日志
+router.delete('/logs', cookieAuthMiddleware, (req, res) => {
+  try {
+    logger.clearLogs();
+    logger.info('日志已清空');
+    res.json({ success: true, message: '日志已清空' });
+  } catch (error) {
+    logger.error('清空日志失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==================== Token 额度 API ====================
+
 // 获取指定Token的模型额度（使用 tokenId）
 router.get('/tokens/:tokenId/quotas', cookieAuthMiddleware, async (req, res) => {
   try {
@@ -471,25 +517,42 @@ router.get('/tokens/:tokenId/quotas', cookieAuthMiddleware, async (req, res) => 
       return res.status(404).json({ success: false, message: 'Token不存在' });
     }
     
-    // 检查token是否过期，如果过期则刷新
-    if (tokenManager.isExpired(tokenData)) {
-      try {
-        tokenData = await tokenManager.refreshToken(tokenData);
-      } catch (error) {
-        logger.error('刷新token失败:', error.message);
-        // 使用 400 而不是 401，避免前端误认为 JWT 登录过期
-        return res.status(400).json({ success: false, message: 'Google Token已过期且刷新失败，请重新登录Google账号' });
+    // 检查 token 是否禁用
+    const isDisabled = tokenData.enable === false;
+    
+    // 使用 tokenId 作为缓存键，优先获取缓存数据
+    let quotaData = quotaManager.getQuota(tokenId);
+    
+    // 禁用的 token 只返回缓存数据，不刷新也不获取新数据
+    if (isDisabled) {
+      if (!quotaData) {
+        // 没有缓存数据，返回空数据
+        quotaData = { lastUpdated: null, models: {} };
       }
-    }
-    
-    // 使用 tokenId 作为缓存键
-    let quotaData = forceRefresh ? null : quotaManager.getQuota(tokenId);
-    
-    if (!quotaData) {
-      // 缓存未命中或强制刷新，从API获取
-      const quotas = await getModelsWithQuotas(tokenData);
-      quotaManager.updateQuota(tokenId, quotas);
-      quotaData = { lastUpdated: Date.now(), models: quotas };
+    } else {
+      // 启用的 token 正常处理
+      // 检查token是否过期，如果过期则刷新
+      if (tokenManager.isExpired(tokenData)) {
+        try {
+          tokenData = await tokenManager.refreshToken(tokenData);
+        } catch (error) {
+          logger.error('刷新token失败:', error.message);
+          // 使用 400 而不是 401，避免前端误认为 JWT 登录过期
+          return res.status(400).json({ success: false, message: 'Google Token已过期且刷新失败，请重新登录Google账号' });
+        }
+      }
+      
+      // 强制刷新时清除缓存
+      if (forceRefresh) {
+        quotaData = null;
+      }
+      
+      if (!quotaData) {
+        // 缓存未命中或强制刷新，从API获取
+        const quotas = await getModelsWithQuotas(tokenData);
+        quotaManager.updateQuota(tokenId, quotas);
+        quotaData = { lastUpdated: Date.now(), models: quotas };
+      }
     }
     
     // 转换时间为北京时间

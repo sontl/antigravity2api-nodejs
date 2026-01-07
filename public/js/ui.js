@@ -62,10 +62,11 @@ function hideLoading() {
 
 function switchTab(tab, saveState = true) {
     // 更新html元素的class以防止闪烁
+    document.documentElement.classList.remove('tab-settings', 'tab-logs');
     if (tab === 'settings') {
         document.documentElement.classList.add('tab-settings');
-    } else {
-        document.documentElement.classList.remove('tab-settings');
+    } else if (tab === 'logs') {
+        document.documentElement.classList.add('tab-logs');
     }
     
     // 移除所有tab的active状态
@@ -79,12 +80,22 @@ function switchTab(tab, saveState = true) {
     
     const tokensPage = document.getElementById('tokensPage');
     const settingsPage = document.getElementById('settingsPage');
+    const logsPage = document.getElementById('logsPage');
     
     // 隐藏所有页面并移除动画类
     tokensPage.classList.add('hidden');
     tokensPage.classList.remove('page-enter');
     settingsPage.classList.add('hidden');
     settingsPage.classList.remove('page-enter');
+    if (logsPage) {
+        logsPage.classList.add('hidden');
+        logsPage.classList.remove('page-enter');
+    }
+    
+    // 清理日志页面的自动刷新（如果离开日志页面）
+    if (tab !== 'logs' && typeof cleanupLogsPage === 'function') {
+        cleanupLogsPage();
+    }
     
     // 显示对应页面并添加入场动画
     if (tab === 'tokens') {
@@ -102,6 +113,17 @@ function switchTab(tab, saveState = true) {
         void settingsPage.offsetWidth;
         settingsPage.classList.add('page-enter');
         loadConfig();
+    } else if (tab === 'logs') {
+        if (logsPage) {
+            logsPage.classList.remove('hidden');
+            // 触发重排以重新播放动画
+            void logsPage.offsetWidth;
+            logsPage.classList.add('page-enter');
+            // 进入日志页面时加载日志
+            if (typeof initLogsPage === 'function') {
+                initLogsPage();
+            }
+        }
     }
     
     // 保存当前Tab状态到localStorage
@@ -113,7 +135,7 @@ function switchTab(tab, saveState = true) {
 // 恢复Tab状态
 function restoreTabState() {
     const savedTab = localStorage.getItem('currentTab');
-    if (savedTab && (savedTab === 'tokens' || savedTab === 'settings')) {
+    if (savedTab && (savedTab === 'tokens' || savedTab === 'settings' || savedTab === 'logs')) {
         switchTab(savedTab, false);
     }
 }

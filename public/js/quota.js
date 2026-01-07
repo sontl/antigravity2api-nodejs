@@ -151,6 +151,9 @@ async function loadTokenQuotaSummary(tokenId) {
         if (data.success && data.data && data.data.models) {
             quotaCache.set(tokenId, data.data);
             renderQuotaSummary(summaryEl, data.data);
+        } else if (data.success && data.data) {
+            // 禁用的 token 可能返回空数据
+            renderQuotaSummary(summaryEl, data.data);
         } else {
             const errMsg = escapeHtml(data.message || '未知错误');
             summaryEl.innerHTML = `<span class="quota-summary-error">📊 ${errMsg}</span>`;
@@ -484,18 +487,25 @@ async function refreshAllQuotas() {
         return;
     }
     
+    // 过滤出启用的 token，禁用的不刷新
+    const enabledTokens = cachedTokens.filter(t => t.enable !== false);
+    if (enabledTokens.length === 0) {
+        showToast('没有已启用的 Token 可刷新', 'warning');
+        return;
+    }
+    
     const btn = document.getElementById('refreshQuotasBtn');
     if (btn) {
         btn.disabled = true;
         btn.textContent = '⏳ 刷新中...';
     }
     
-    // 清除所有前端缓存
-    quotaCache.clear();
+    // 只清除启用 token 的缓存
+    enabledTokens.forEach(t => quotaCache.clear(t.id));
     
     try {
-        // 并行刷新所有 Token 的额度
-        const refreshPromises = cachedTokens.map(async (token) => {
+        // 并行刷新已启用 Token 的额度
+        const refreshPromises = enabledTokens.map(async (token) => {
             try {
                 const response = await authFetch(`/admin/tokens/${encodeURIComponent(token.id)}/quotas?refresh=true`);
                 const data = await response.json();
@@ -510,12 +520,12 @@ async function refreshAllQuotas() {
         
         await Promise.all(refreshPromises);
         
-        // 重新渲染所有额度摘要
-        cachedTokens.forEach(token => {
+        // 重新渲染启用 token 的额度摘要
+        enabledTokens.forEach(token => {
             loadTokenQuotaSummary(token.id);
         });
         
-        showToast('所有额度已刷新', 'success');
+        showToast(`已刷新 ${enabledTokens.length} 个 Token 的额度`, 'success');
     } catch (error) {
         showToast('刷新额度失败: ' + error.message, 'error');
     } finally {

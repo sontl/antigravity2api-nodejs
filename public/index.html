@@ -12,6 +12,7 @@
             var currentTab = localStorage.getItem('currentTab') || 'tokens';
             var classes = ['auth-checking'];
             if (currentTab === 'settings') classes.push('tab-settings');
+            if (currentTab === 'logs') classes.push('tab-logs');
             document.documentElement.className = classes.join(' ');
             // 检测字体加载
             if ('fonts' in document) {
@@ -41,11 +42,31 @@ html.auth-ready:not(.logged-in) #mainContent { display: none !important; }
 /* Tab状态管理 */
 html.tab-settings #tokensPage { display: none !important; }
 html.tab-settings #settingsPage { display: block !important; }
+html.tab-settings #logsPage { display: none !important; }
 html.tab-settings .tab[data-tab="tokens"] {
     background: transparent !important;
     color: var(--text-light, #888) !important;
 }
 html.tab-settings .tab[data-tab="settings"] {
+    background: var(--primary, #4f46e5) !important;
+    color: white !important;
+}
+html.tab-settings .tab[data-tab="logs"] {
+    background: transparent !important;
+    color: var(--text-light, #888) !important;
+}
+html.tab-logs #tokensPage { display: none !important; }
+html.tab-logs #settingsPage { display: none !important; }
+html.tab-logs #logsPage { display: flex !important; }
+html.tab-logs .tab[data-tab="tokens"] {
+    background: transparent !important;
+    color: var(--text-light, #888) !important;
+}
+html.tab-logs .tab[data-tab="settings"] {
+    background: transparent !important;
+    color: var(--text-light, #888) !important;
+}
+html.tab-logs .tab[data-tab="logs"] {
     background: var(--primary, #4f46e5) !important;
     color: white !important;
 }
@@ -116,8 +137,9 @@ html.tab-settings .tab[data-tab="settings"] {
         <div id="mainContent" class="main-content hidden">
             <div class="header">
             <div class="tabs">
-                <button class="tab active" data-tab="tokens" onclick="switchTab('tokens')">🎯 Token</button>
-                <button class="tab" data-tab="settings" onclick="switchTab('settings')">⚙️ 设置</button>
+                <button class="tab active" data-tab="tokens" onclick="switchTab('tokens')"><span class="tab-icon">🎯</span><span class="tab-text">Token</span></button>
+                <button class="tab" data-tab="settings" onclick="switchTab('settings')"><span class="tab-icon">⚙️</span><span class="tab-text">设置</span></button>
+                <button class="tab" data-tab="logs" onclick="switchTab('logs')"><span class="tab-icon">📋</span><span class="tab-text">日志</span></button>
             </div>
                 <div class="header-right">
                     <button onclick="logout()">🚪 退出</button>
@@ -162,6 +184,37 @@ html.tab-settings .tab[data-tab="settings"] {
                             <div class="empty-state-hint">点击上方OAuth按钮添加Token</div>
                         </div>
                     </div>
+                </div>
+
+                <!-- 日志页面 -->
+                <div id="logsPage" class="hidden">
+                    <div class="logs-top-bar">
+                        <div class="logs-top-row">
+                            <div id="logStats" class="log-stats">
+                                <!-- 日志统计将由 JS 渲染 -->
+                            </div>
+                        </div>
+                        <div class="logs-second-row">
+                            <div class="log-search">
+                                <input type="text" id="logSearchInput" placeholder="搜索日志..." oninput="searchLogs(this.value)">
+                            </div>
+                            <div class="log-action-btns">
+                                <button id="autoRefreshBtn" class="btn btn-sm btn-secondary" onclick="toggleAutoRefresh()" title="每3秒自动刷新日志">🔄 自动刷新</button>
+                                <button class="btn btn-sm btn-info" onclick="loadLogs(); loadLogStats();" title="手动刷新日志">↻ 刷新</button>
+                                <button class="btn btn-sm" style="background: var(--primary);" onclick="exportLogs()" title="导出日志为文本文件">📤 导出</button>
+                                <button class="btn btn-sm btn-danger" onclick="clearLogs()" title="清空所有日志">🗑️ 清空</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="log-container">
+                        <div id="logList" class="log-list">
+                            <div class="log-empty">
+                                <div class="log-empty-icon">📋</div>
+                                <div class="log-empty-text">加载中...</div>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="loadMoreLogsBtn" class="btn btn-secondary load-more-btn" onclick="loadMoreLogs()" style="display: none;">加载更多</button>
                 </div>
 
                 <!-- 设置页面 -->
@@ -392,6 +445,7 @@ html.tab-settings .tab[data-tab="settings"] {
     <script src="js/quota.js" defer></script>
     <script src="js/tokens.js" defer></script>
     <script src="js/config.js" defer></script>
+    <script src="js/logs.js" defer></script>
     <script src="js/main.js" defer></script>
 </body>
 </html>

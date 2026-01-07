@@ -19,6 +19,30 @@ import {
 
 // 生成随机凭据的缓存
 let generatedCredentials = null;
+// 生成的 API_KEY 缓存
+let generatedApiKey = null;
+
+/**
+ * 生成或获取 API_KEY
+ * 如果用户未配置，自动生成随机密钥
+ */
+function getApiKey() {
+  const apiKey = process.env.API_KEY;
+  
+  if (apiKey) {
+    return apiKey;
+  }
+  
+  // 生成随机 API_KEY（只生成一次）
+  if (!generatedApiKey) {
+    generatedApiKey = 'sk-' + crypto.randomBytes(24).toString('hex');
+  }
+  
+  return generatedApiKey;
+}
+
+// 是否已显示过凭据提示
+let credentialsDisplayed = false;
 
 /**
  * 生成或获取管理员凭据
@@ -41,25 +65,51 @@ function getAdminCredentials() {
       password: password || crypto.randomBytes(16).toString('base64').replace(/[+/=]/g, ''),
       jwtSecret: jwtSecret || crypto.randomBytes(32).toString('hex')
     };
-    
-    // 显示生成的凭据
-    if (!username || !password) {
-      log.warn('═══════════════════════════════════════════════════════════');
-      log.warn('⚠️  未配置管理员账号密码，已自动生成随机凭据：');
-      log.warn(`    用户名: ${generatedCredentials.username}`);
-      log.warn(`    密码:   ${generatedCredentials.password}`);
-      log.warn('═══════════════════════════════════════════════════════════');
-      log.warn('⚠️  重启后凭据将重新生成！建议在 .env 文件中配置：');
-      log.warn('    ADMIN_USERNAME=你的用户名');
-      log.warn('    ADMIN_PASSWORD=你的密码');
-      log.warn('    JWT_SECRET=你的密钥');
-      log.warn('═══════════════════════════════════════════════════════════');
-    } else if (!jwtSecret) {
-      log.warn('⚠️ 未配置 JWT_SECRET，已生成随机密钥（重启后登录会话将失效）');
-    }
   }
   
   return generatedCredentials;
+}
+
+/**
+ * 显示生成的凭据提示（只显示一次）
+ */
+function displayGeneratedCredentials() {
+  if (credentialsDisplayed) return;
+  credentialsDisplayed = true;
+  
+  const username = process.env.ADMIN_USERNAME;
+  const password = process.env.ADMIN_PASSWORD;
+  const apiKey = process.env.API_KEY;
+  const jwtSecret = process.env.JWT_SECRET;
+  
+  const needsUsername = !username;
+  const needsPassword = !password;
+  const needsApiKey = !apiKey;
+  const needsJwtSecret = !jwtSecret;
+  
+  // 如果有任何凭据需要生成，显示提示
+  if (needsUsername || needsPassword || needsApiKey) {
+    const credentials = getAdminCredentials();
+    log.warn('═══════════════════════════════════════════════════════════');
+    log.warn('⚠️  未配置完整凭据，已自动生成随机凭据：');
+    if (needsUsername) {
+      log.warn(`    用户名: ${credentials.username}`);
+    }
+    if (needsPassword) {
+      log.warn(`    密码:   ${credentials.password}`);
+    }
+    if (needsApiKey) {
+      log.warn(`    API密钥: ${getApiKey()}`);
+    }
+    log.warn('═══════════════════════════════════════════════════════════');
+    log.warn('⚠️  重启后凭据将重新生成！建议在 .env 文件中配置：');
+    if (needsUsername) log.warn('    ADMIN_USERNAME=你的用户名');
+    if (needsPassword) log.warn('    ADMIN_PASSWORD=你的密码');
+    if (needsApiKey) log.warn('    API_KEY=你的密钥');
+    log.warn('═══════════════════════════════════════════════════════════');
+  } else if (needsJwtSecret) {
+    log.warn('⚠️ 未配置 JWT_SECRET，已生成随机密钥（重启后登录会话将失效）');
+  }
 }
 
 const { envPath, configJsonPath } = getConfigPaths();
@@ -155,7 +205,7 @@ export function buildConfig(jsonConfig) {
     },
     security: {
       maxRequestSize: jsonConfig.server?.maxRequestSize || DEFAULT_MAX_REQUEST_SIZE,
-      apiKey: process.env.API_KEY || null
+      apiKey: getApiKey()
     },
     admin: getAdminCredentials(),
     useNativeAxios: jsonConfig.other?.useNativeAxios !== false,
@@ -182,6 +232,9 @@ export function buildConfig(jsonConfig) {
 }
 
 const config = buildConfig(jsonConfig);
+
+// 显示生成的凭据提示
+displayGeneratedCredentials();
 
 log.info('✓ 配置加载成功');
 

@@ -356,6 +356,10 @@ function renderTokens(tokens) {
                     <span class="info-edit-icon">✏️</span>
                 </div>
             </div>
+            <div class="token-id-row" title="Token ID: ${escapeHtml(tokenId)}">
+                <span class="token-id-label">🔑</span>
+                <span class="token-id-value">${escapeHtml(tokenId.length > 24 ? tokenId.substring(0, 12) + '...' + tokenId.substring(tokenId.length - 8) : tokenId)}</span>
+            </div>
             <div class="token-quota-inline" id="quota-inline-${escapeHtml(cardId)}">
                 <div class="quota-inline-header" onclick="toggleQuotaExpand('${escapeJs(cardId)}', '${safeTokenId}')">
                     <span class="quota-inline-summary" id="quota-summary-${escapeHtml(cardId)}">📊 加载中...</span>
