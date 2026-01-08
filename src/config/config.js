@@ -261,10 +261,10 @@ export function buildConfig(jsonConfig) {
     timeout: jsonConfig.other?.timeout || DEFAULT_TIMEOUT,
     retryTimes: Number.isFinite(jsonConfig.other?.retryTimes) ? jsonConfig.other.retryTimes : DEFAULT_RETRY_TIMES,
     proxy: getProxyConfig(),
-    // 反代系统提示词（从 .env 读取，可在前端修改，允许为空）
-    systemInstruction: process.env.SYSTEM_INSTRUCTION || DEFAULT_SYSTEM_INSTRUCTION,
-    // 官方系统提示词（从 .env 读取，可在前端修改，为空时使用默认值）
-    officialSystemPrompt: process.env.OFFICIAL_SYSTEM_PROMPT || DEFAULT_OFFICIAL_SYSTEM_PROMPT,
+    // 反代系统提示词（从 .env 读取，可在前端修改，空字符串代表不使用）
+    systemInstruction: process.env.SYSTEM_INSTRUCTION ?? '',
+    // 官方系统提示词（从 .env 读取，可在前端修改，空字符串代表不使用）
+    officialSystemPrompt: process.env.OFFICIAL_SYSTEM_PROMPT ?? '',
     // 官方提示词位置配置：'before' = 官方提示词在反代提示词前面，'after' = 官方提示词在反代提示词后面
     officialPromptPosition: jsonConfig.other?.officialPromptPosition || 'before',
     // 是否合并系统提示词为单个 part，false 则保留多 part 结构（需要先开启 useContextSystemPrompt）
@@ -272,7 +272,7 @@ export function buildConfig(jsonConfig) {
     skipProjectIdFetch: jsonConfig.other?.skipProjectIdFetch === true,
     useContextSystemPrompt: jsonConfig.other?.useContextSystemPrompt === true,
     passSignatureToClient: jsonConfig.other?.passSignatureToClient === true,
-    useFallbackSignature: jsonConfig.other?.useFallbackSignature !== false,
+    useFallbackSignature: jsonConfig.other?.useFallbackSignature === true,
     // 签名缓存配置（新版）
     cacheAllSignatures: jsonConfig.other?.cacheAllSignatures === true ||
       process.env.CACHE_ALL_SIGNATURES === '1' ||
@@ -280,10 +280,10 @@ export function buildConfig(jsonConfig) {
     cacheToolSignatures: jsonConfig.other?.cacheToolSignatures !== false,
     cacheImageSignatures: jsonConfig.other?.cacheImageSignatures !== false,
     cacheThinking: jsonConfig.other?.cacheThinking !== false,
-    // 调试：完整打印最终请求体与原始响应（可能包含敏感内容/大体积数据）
-    debugDumpRequestResponse:
-      jsonConfig.other?.debugDumpRequestResponse === true ||
-      process.env.DEBUG_DUMP_REQUEST_RESPONSE === '1'
+    // 假非流：非流式请求使用流式获取数据后返回非流式格式（默认启用）
+    fakeNonStream: jsonConfig.other?.fakeNonStream !== false,
+    // 调试：完整打印最终请求体与原始响应（可能包含敏感内容/大体积数据，只从环境变量读取）
+    debugDumpRequestResponse: process.env.DEBUG_DUMP_REQUEST_RESPONSE === '1'
   };
 }
 

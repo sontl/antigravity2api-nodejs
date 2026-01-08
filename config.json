@@ -36,11 +36,11 @@
     "officialPromptPosition": "before",
     "mergeSystemPrompt": true,
     "passSignatureToClient": false,
-    "debugDumpRequestResponse": false,
     "useFallbackSignature": false,
     "cacheAllSignatures": false,
     "cacheToolSignatures": true,
     "cacheImageSignatures": true,
-    "cacheThinking": true
+    "cacheThinking": true,
+    "fakeNonStream": true
   }
 }
